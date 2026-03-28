@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Profil - Scrum Quiz{% endblock %}
+
+{% block content %}
+<div class="profile-container">
+    <h2>Benutzerprofil</h2>
+
+    <div class="profile-info">
+        <h3>Kontoinformationen</h3>
+        <p><strong>Benutzername:</strong> {{ current_user.username }}</p>
+        {% if current_user.email %}
+            <p><strong>E-Mail:</strong> {{ current_user.email }}</p>
+        {% endif %}
+        <p><strong>Mitglied seit:</strong> {{ current_user.created_at.strftime('%d.%m.%Y') }}</p>
+        {% if current_user.last_login %}
+            <p><strong>Letzter Login:</strong> {{ current_user.last_login.strftime('%d.%m.%Y %H:%M') }} Uhr</p>
+        {% endif %}
+    </div>
+
+    <div class="profile-stats">
+        <h3>Statistiken</h3>
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-value">{{ stats.total_sessions }}</div>
+                <div class="stat-label">Abgeschlossene Quiz</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ stats.total_questions }}</div>
+                <div class="stat-label">Beantwortete Fragen</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ stats.total_correct }}</div>
+                <div class="stat-label">Richtige Antworten</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ stats.success_rate }}%</div>
+                <div class="stat-label">Erfolgsquote</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ stats.catalog_count }}</div>
+                <div class="stat-label">Fragenkataloge</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="profile-actions">
+        <a href="{{ url_for('catalogs.manage') }}" class="btn btn-primary">Kataloge verwalten</a>
+        <a href="{{ url_for('main.questions_overview') }}" class="btn btn-secondary">Fragenübersicht</a>
+    </div>
+</div>
+{% endblock %}

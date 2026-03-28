@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Katalog importieren - Scrum Quiz{% endblock %}
+
+{% block content %}
+<div class="catalog-form-container">
+    <h2>Katalog importieren</h2>
+    <p>Importieren Sie einen Fragenkatalog aus einer JSON-Datei.</p>
+
+    <form method="POST" enctype="multipart/form-data" class="catalog-form">
+        <div class="form-group">
+            <label for="file">JSON-Datei auswählen *</label>
+            <input
+                type="file"
+                id="file"
+                name="file"
+                accept=".json,application/json"
+                required
+            >
+            <small class="form-text">Nur .json Dateien sind erlaubt (max. 16 MB)</small>
+        </div>
+
+        <div class="form-group">
+            <label for="name">Katalogname *</label>
+            <input
+                type="text"
+                id="name"
+                name="name"
+                required
+                maxlength="200"
+                placeholder="z.B. Importierter Katalog"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="description">Beschreibung (optional)</label>
+            <textarea
+                id="description"
+                name="description"
+                rows="3"
+                placeholder="Beschreiben Sie den Inhalt dieses Katalogs..."
+            ></textarea>
+        </div>
+
+        <div class="info-box">
+            <h4>JSON-Format</h4>
+            <p>Die JSON-Datei muss ein Array von Fragen enthalten. Jede Frage sollte mindestens folgende Felder haben:</p>
+            <ul>
+                <li><code>id</code>: Eindeutige ID (String)</li>
+                <li><code>question</code>: Fragetext (String)</li>
+                <li><code>options</code>: Antwortmöglichkeiten (Object mit A, B, C, D)</li>
+                <li><code>correct_answer</code>: Richtige Antwort (String oder Array)</li>
+            </ul>
+            <p>Optional: <code>category</code>, <code>subcategory</code>, <code>explanation</code>, <code>question_type</code></p>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Katalog importieren</button>
+            <a href="{{ url_for('catalogs.manage') }}" class="btn btn-secondary">Abbrechen</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

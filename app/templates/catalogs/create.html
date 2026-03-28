@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Neuer Katalog - Scrum Quiz{% endblock %}
+
+{% block content %}
+<div class="catalog-form-container">
+    <h2>Neuen Katalog erstellen</h2>
+
+    <form method="POST" class="catalog-form">
+        <div class="form-group">
+            <label for="name">Katalogname *</label>
+            <input
+                type="text"
+                id="name"
+                name="name"
+                required
+                maxlength="200"
+                placeholder="z.B. Scrum Master Zertifizierung"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="description">Beschreibung (optional)</label>
+            <textarea
+                id="description"
+                name="description"
+                rows="3"
+                placeholder="Beschreiben Sie den Inhalt dieses Katalogs..."
+            ></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>Katalog-Inhalt</label>
+            <div class="radio-group">
+                <label>
+                    <input type="radio" name="copy_sample" value="no" checked>
+                    Leerer Katalog (Sie können später Fragen importieren)
+                </label>
+                <label>
+                    <input type="radio" name="copy_sample" value="yes">
+                    Mit Beispielfragen aus Standard-Katalog
+                </label>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Katalog erstellen</button>
+            <a href="{{ url_for('catalogs.manage') }}" class="btn btn-secondary">Abbrechen</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

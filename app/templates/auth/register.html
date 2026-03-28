@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Registrieren - Scrum Quiz{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <h2>Registrierung</h2>
+    <p>Erstellen Sie ein neues Konto, um das Quiz zu nutzen.</p>
+
+    <form method="POST" class="auth-form">
+        <div class="form-group">
+            <label for="username">Benutzername *</label>
+            <input
+                type="text"
+                id="username"
+                name="username"
+                required
+                minlength="3"
+                autocomplete="username"
+                placeholder="Mindestens 3 Zeichen"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="email">E-Mail (optional)</label>
+            <input
+                type="email"
+                id="email"
+                name="email"
+                autocomplete="email"
+                placeholder="ihre@email.de"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="password">Passwort *</label>
+            <input
+                type="password"
+                id="password"
+                name="password"
+                required
+                minlength="8"
+                autocomplete="new-password"
+                placeholder="Mindestens 8 Zeichen"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="password_confirm">Passwort bestätigen *</label>
+            <input
+                type="password"
+                id="password_confirm"
+                name="password_confirm"
+                required
+                minlength="8"
+                autocomplete="new-password"
+                placeholder="Passwort wiederholen"
+            >
+        </div>
+
+        <button type="submit" class="btn btn-primary">Registrieren</button>
+    </form>
+
+    <p class="auth-link">
+        Bereits ein Konto? <a href="{{ url_for('auth.login') }}">Hier anmelden</a>
+    </p>
+</div>
+{% endblock %}

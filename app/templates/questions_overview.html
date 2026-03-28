@@ -1,0 +1,676 @@
+{% extends "base.html" %}
+
+{% block title %}Fragenübersicht - Quiz-App{% endblock %}
+
+{% block content %}
+<div class="questions-overview">
+    <h1>Fragenübersicht (Debug)</h1>
+    <p class="total-count">Gesamt: {{ total_questions }} Fragen</p>
+
+    <!-- Filter und Suche -->
+    <div class="filter-section">
+        <form method="get" action="{{ url_for('main.questions_overview') }}" class="filter-form">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label for="search">Suche:</label>
+                    <input type="text" id="search" name="search" value="{{ search }}" placeholder="ID oder Fragentext...">
+                </div>
+
+                <div class="filter-group">
+                    <label for="category">Kategorie:</label>
+                    <select id="category" name="category">
+                        <option value="">Alle</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}" {% if cat == filter_category %}selected{% endif %}>{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label for="subcategory">Subkategorie:</label>
+                    <select id="subcategory" name="subcategory">
+                        <option value="">Alle</option>
+                        {% for subcat in subcategories %}
+                        <option value="{{ subcat }}" {% if subcat == filter_subcategory %}selected{% endif %}>{{ subcat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label for="type">Typ:</label>
+                    <select id="type" name="type">
+                        <option value="">Alle</option>
+                        {% for t in types %}
+                        <option value="{{ t }}" {% if t == filter_type %}selected{% endif %}>{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label for="min_weight">Min. Gewicht:</label>
+                    <select id="min_weight" name="min_weight">
+                        <option value="">Alle</option>
+                        <option value="4" {% if min_weight == '4' %}selected{% endif %}>≥ 4 (mind. 1× falsch)</option>
+                        <option value="5" {% if min_weight == '5' %}selected{% endif %}>≥ 5 (schwierig)</option>
+                        <option value="8" {% if min_weight == '8' %}selected{% endif %}>≥ 8 (sehr schwierig)</option>
+                    </select>
+                    <small style="font-size: 0.8em; color: #666;">Zeigt nur Fragen, die du falsch beantwortet hast</small>
+                </div>
+
+                <div class="filter-group">
+                    <label for="per_page">Pro Seite:</label>
+                    <select id="per_page" name="per_page">
+                        <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                        <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                        <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                        <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                    </select>
+                </div>
+
+                <input type="hidden" name="sort_by" value="{{ sort_by }}">
+                <input type="hidden" name="sort_order" value="{{ sort_order }}">
+
+                <button type="submit" class="btn btn-primary">Filtern</button>
+                <a href="{{ url_for('main.questions_overview') }}" class="btn btn-secondary">Zurücksetzen</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Fragen-Tabelle -->
+    <div class="table-container">
+        <table class="questions-table">
+            <thead>
+                <tr>
+                    <th>
+                        <a href="{{ url_for('main.questions_overview', page=page, per_page=per_page, sort_by='id',
+                                           sort_order='desc' if sort_by == 'id' and sort_order == 'asc' else 'asc',
+                                           category=filter_category, subcategory=filter_subcategory, type=filter_type, search=search, min_weight=min_weight) }}">
+                            ID {% if sort_by == 'id' %}{{ '▲' if sort_order == 'asc' else '▼' }}{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('main.questions_overview', page=page, per_page=per_page, sort_by='category',
+                                           sort_order='desc' if sort_by == 'category' and sort_order == 'asc' else 'asc',
+                                           category=filter_category, subcategory=filter_subcategory, type=filter_type, search=search, min_weight=min_weight) }}">
+                            Kategorie {% if sort_by == 'category' %}{{ '▲' if sort_order == 'asc' else '▼' }}{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('main.questions_overview', page=page, per_page=per_page, sort_by='subcategory',
+                                           sort_order='desc' if sort_by == 'subcategory' and sort_order == 'asc' else 'asc',
+                                           category=filter_category, subcategory=filter_subcategory, type=filter_type, search=search, min_weight=min_weight) }}">
+                            Subkategorie {% if sort_by == 'subcategory' %}{{ '▲' if sort_order == 'asc' else '▼' }}{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="{{ url_for('main.questions_overview', page=page, per_page=per_page, sort_by='type',
+                                           sort_order='desc' if sort_by == 'type' and sort_order == 'asc' else 'asc',
+                                           category=filter_category, subcategory=filter_subcategory, type=filter_type, search=search, min_weight=min_weight) }}">
+                            Typ {% if sort_by == 'type' %}{{ '▲' if sort_order == 'asc' else '▼' }}{% endif %}
+                        </a>
+                    </th>
+                    <th>Frage (Vorschau)</th>
+                    <th>Antwort</th>
+                    <th>Aktionen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for question in questions %}
+                <tr>
+                    <td class="question-id">{{ question.id }}</td>
+                    <td>{{ question.category }}</td>
+                    <td>{{ question.subcategory or '-' }}</td>
+                    <td>
+                        <span class="type-badge type-{{ question.question_type or 'single' }}">
+                            {{ question.question_type or 'single' }}
+                        </span>
+                    </td>
+                    <td class="question-preview">{{ question.question[:80] }}{% if question.question|length > 80 %}...{% endif %}</td>
+                    <td class="correct-answer">
+                        {% if question.question_type == 'text' %}
+                            <span class="text-answer-indicator">Freitext</span>
+                        {% elif question.correct_answer is string %}
+                            {{ question.correct_answer }}
+                        {% else %}
+                            {{ question.correct_answer|join(', ') }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button class="btn-small btn-info" onclick="showQuestionDetail('{{ question.id }}')">Details</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Paginierung -->
+    {% if total_pages > 1 %}
+    <div class="pagination">
+        {% if page > 1 %}
+        <a href="{{ url_for('main.questions_overview', page=1, per_page=per_page, sort_by=sort_by, sort_order=sort_order,
+                           category=filter_category, subcategory=filter_subcategory, type=filter_type, search=search, min_weight=min_weight) }}"
+           class="page-link">« Erste</a>
+        <a href="{{ url_for('main.questions_overview', page=page-1, per_page=per_page, sort_by=sort_by, sort_order=sort_order,
+                           category=filter_category, subcategory=filter_subcategory, type=filter_type, search=search, min_weight=min_weight) }}"
+           class="page-link">‹ Zurück</a>
+        {% endif %}
+
+        <span class="page-info">Seite {{ page }} von {{ total_pages }}</span>
+
+        {% if page < total_pages %}
+        <a href="{{ url_for('main.questions_overview', page=page+1, per_page=per_page, sort_by=sort_by, sort_order=sort_order,
+                           category=filter_category, subcategory=filter_subcategory, type=filter_type, search=search, min_weight=min_weight) }}"
+           class="page-link">Weiter ›</a>
+        <a href="{{ url_for('main.questions_overview', page=total_pages, per_page=per_page, sort_by=sort_by, sort_order=sort_order,
+                           category=filter_category, subcategory=filter_subcategory, type=filter_type, search=search, min_weight=min_weight) }}"
+           class="page-link">Letzte »</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal für Fragendetails -->
+<div id="questionModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h2>Fragendetails</h2>
+        <div id="modalBody">
+            <p>Lädt...</p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .questions-overview {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 2em;
+    }
+
+    .total-count {
+        color: #666;
+        margin-bottom: 1em;
+    }
+
+    .filter-section {
+        background: #f5f5f5;
+        padding: 1.5em;
+        border-radius: 8px;
+        margin-bottom: 2em;
+    }
+
+    .filter-form {
+        width: 100%;
+    }
+
+    .filter-row {
+        display: flex;
+        gap: 1em;
+        flex-wrap: wrap;
+        align-items: flex-end;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3em;
+    }
+
+    .filter-group label {
+        font-size: 0.9em;
+        font-weight: bold;
+        color: #333;
+    }
+
+    .filter-group input,
+    .filter-group select {
+        padding: 0.5em;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 1em;
+    }
+
+    .table-container {
+        overflow-x: auto;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .questions-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .questions-table th {
+        background: #2196F3;
+        color: white;
+        padding: 1em;
+        text-align: left;
+        font-weight: bold;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .questions-table th a {
+        color: white;
+        text-decoration: none;
+        display: block;
+    }
+
+    .questions-table th a:hover {
+        text-decoration: underline;
+    }
+
+    .questions-table td {
+        padding: 0.8em;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .questions-table tr:hover {
+        background-color: #f5f5f5;
+    }
+
+    .question-id {
+        font-family: monospace;
+        font-weight: bold;
+        color: #1976D2;
+    }
+
+    .question-preview {
+        max-width: 400px;
+    }
+
+    .correct-answer {
+        font-weight: bold;
+        color: #4CAF50;
+    }
+
+    .text-answer-indicator {
+        color: #9C27B0;
+        font-style: italic;
+    }
+
+    .type-badge {
+        display: inline-block;
+        padding: 0.3em 0.6em;
+        border-radius: 12px;
+        font-size: 0.85em;
+        font-weight: bold;
+    }
+
+    .type-single {
+        background-color: #E3F2FD;
+        color: #1976D2;
+    }
+
+    .type-multiple {
+        background-color: #FFF3E0;
+        color: #F57C00;
+    }
+
+    .type-text {
+        background-color: #F3E5F5;
+        color: #7B1FA2;
+    }
+
+    .btn-small {
+        padding: 0.4em 0.8em;
+        font-size: 0.9em;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+
+    .btn-info {
+        background-color: #2196F3;
+        color: white;
+    }
+
+    .btn-info:hover {
+        background-color: #1976D2;
+    }
+
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 1em;
+        margin-top: 2em;
+    }
+
+    .page-link {
+        padding: 0.5em 1em;
+        background: #2196F3;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        transition: background-color 0.3s;
+    }
+
+    .page-link:hover {
+        background-color: #1976D2;
+    }
+
+    .page-info {
+        font-weight: bold;
+        color: #333;
+    }
+
+    /* Modal */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0,0,0,0.5);
+    }
+
+    .modal-content {
+        background-color: #fefefe;
+        margin: 5% auto;
+        padding: 2em;
+        border: 1px solid #888;
+        border-radius: 8px;
+        width: 80%;
+        max-width: 900px;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+
+    .close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+
+    .close:hover,
+    .close:focus {
+        color: #000;
+    }
+
+    .detail-section {
+        margin-bottom: 1.5em;
+    }
+
+    .detail-section h3 {
+        color: #2196F3;
+        margin-bottom: 0.5em;
+    }
+
+    .detail-section pre {
+        background: #f5f5f5;
+        padding: 1em;
+        border-radius: 4px;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    .option-item {
+        padding: 0.5em;
+        margin: 0.3em 0;
+        background: #f5f5f5;
+        border-radius: 4px;
+    }
+
+    .option-item.correct {
+        background: #C8E6C9;
+        font-weight: bold;
+    }
+
+    /* Gewichts-Tabelle */
+    .weights-table-container {
+        overflow-x: auto;
+        margin-top: 1em;
+    }
+
+    .weights-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+    }
+
+    .weights-table th {
+        background: #f5f5f5;
+        padding: 0.8em;
+        text-align: left;
+        font-weight: bold;
+        border-bottom: 2px solid #e0e0e0;
+    }
+
+    .weights-table td {
+        padding: 0.8em;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .weights-table tbody tr:hover {
+        background: #f9f9f9;
+    }
+
+    .weight-badge {
+        display: inline-block;
+        padding: 0.4em 0.8em;
+        border-radius: 12px;
+        font-weight: bold;
+        font-size: 1.1em;
+    }
+
+    .weight-low {
+        background-color: #C8E6C9;
+        color: #2E7D32;
+    }
+
+    .weight-medium {
+        background-color: #FFF9C4;
+        color: #F57F17;
+    }
+
+    .weight-high {
+        background-color: #FFCDD2;
+        color: #C62828;
+    }
+
+    .probability-bar-container {
+        position: relative;
+        width: 100%;
+        max-width: 200px;
+        height: 28px;
+        background: #e0e0e0;
+        border-radius: 14px;
+        overflow: hidden;
+    }
+
+    .probability-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        background: linear-gradient(90deg, #4CAF50 0%, #FF9800 50%, #F44336 100%);
+        transition: width 0.3s ease;
+    }
+
+    .probability-text {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        font-weight: bold;
+        font-size: 0.9em;
+        color: #333;
+        z-index: 1;
+    }
+</style>
+
+<script>
+    function showQuestionDetail(questionId) {
+        const modal = document.getElementById('questionModal');
+        const modalBody = document.getElementById('modalBody');
+
+        modal.style.display = 'block';
+        modalBody.innerHTML = '<p>Lädt...</p>';
+
+        fetch(`/questions/${questionId}`)
+            .then(response => response.json())
+            .then(data => {
+                let html = `
+                    <div class="detail-section">
+                        <h3>ID</h3>
+                        <p><code>${data.id}</code></p>
+                    </div>
+
+                    <div class="detail-section">
+                        <h3>Kategorie / Subkategorie</h3>
+                        <p><strong>${data.category || '-'}</strong> / ${data.subcategory || '-'}</p>
+                    </div>
+
+                    <div class="detail-section">
+                        <h3>Typ</h3>
+                        <p><span class="type-badge type-${data.question_type || 'single'}">${data.question_type || 'single'}</span></p>
+                    </div>
+
+                    <div class="detail-section">
+                        <h3>Frage</h3>
+                        <p>${data.question}</p>
+                    </div>
+                `;
+
+                if (data.options) {
+                    html += `
+                        <div class="detail-section">
+                            <h3>Antwortmöglichkeiten</h3>
+                    `;
+
+                    const correctAnswer = Array.isArray(data.correct_answer) ? data.correct_answer : [data.correct_answer];
+
+                    for (const [key, value] of Object.entries(data.options)) {
+                        const isCorrect = correctAnswer.includes(key);
+                        html += `<div class="option-item ${isCorrect ? 'correct' : ''}"><strong>${key}:</strong> ${value}</div>`;
+                    }
+                    html += `</div>`;
+                }
+
+                html += `
+                    <div class="detail-section">
+                        <h3>Korrekte Antwort(en)</h3>
+                        <p class="correct-answer">${Array.isArray(data.correct_answer) ? data.correct_answer.join(', ') : data.correct_answer}</p>
+                    </div>
+                `;
+
+                if (data.sample_answer) {
+                    html += `
+                        <div class="detail-section">
+                            <h3>Musterantwort</h3>
+                            <p>${data.sample_answer}</p>
+                        </div>
+                    `;
+                }
+
+                html += `
+                    <div class="detail-section">
+                        <h3>Erklärung</h3>
+                        <p>${data.explanation}</p>
+                    </div>
+                `;
+
+                // Gewichtsinformationen anzeigen
+                if (data.weights && data.weights.length > 0) {
+                    html += `
+                        <div class="detail-section">
+                            <h3>Fibonacci-Gewichte (Wahrscheinlichkeit)</h3>
+                            <p style="color: #666; font-size: 0.9em; margin-bottom: 1em;">
+                                Das Gewicht bestimmt, wie wahrscheinlich diese Frage dem User gestellt wird.<br>
+                                <strong>Neue Fragen:</strong> Gewicht 3 |
+                                <strong>Falsche Antworten:</strong> Gewicht steigt (3→5→8→13...) |
+                                <strong>Richtige Antworten:</strong> Gewicht sinkt (3→2→1, min=1)
+                            </p>
+                            <div class="weights-table-container">
+                                <table class="weights-table">
+                                    <thead>
+                                        <tr>
+                                            <th>User</th>
+                                            <th>Gewicht</th>
+                                            <th>Wahrscheinlichkeit</th>
+                                            <th>Letzte Änderung</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                    `;
+
+                    data.weights.forEach(w => {
+                        const lastUpdated = w.last_updated ? new Date(w.last_updated).toLocaleString('de-DE') : 'Nie';
+                        const weightClass = w.weight === 1 ? 'weight-low' : (w.weight >= 8 ? 'weight-high' : 'weight-medium');
+
+                        // Visuelle Wahrscheinlichkeitsanzeige (Balken)
+                        const maxWeight = 13; // Für die Visualisierung
+                        const barWidth = Math.min((w.weight / maxWeight) * 100, 100);
+
+                        html += `
+                            <tr>
+                                <td><strong>${w.username}</strong></td>
+                                <td><span class="weight-badge ${weightClass}">${w.weight}</span></td>
+                                <td>
+                                    <div class="probability-bar-container">
+                                        <div class="probability-bar" style="width: ${barWidth}%"></div>
+                                        <span class="probability-text">${w.weight}x</span>
+                                    </div>
+                                </td>
+                                <td style="font-size: 0.85em; color: #666;">${lastUpdated}</td>
+                            </tr>
+                        `;
+                    });
+
+                    html += `
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <div class="detail-section">
+                            <h3>Fibonacci-Gewichte</h3>
+                            <p style="color: #999; font-style: italic;">Diese Frage wurde noch von keinem User beantwortet.</p>
+                        </div>
+                    `;
+                }
+
+                html += `
+                    <div class="detail-section">
+                        <h3>Vollständige JSON-Daten</h3>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                `;
+
+                modalBody.innerHTML = html;
+            })
+            .catch(error => {
+                modalBody.innerHTML = `<p style="color: red;">Fehler beim Laden: ${error}</p>`;
+            });
+    }
+
+    function closeModal() {
+        document.getElementById('questionModal').style.display = 'none';
+    }
+
+    // Modal schließen bei Klick außerhalb
+    window.onclick = function(event) {
+        const modal = document.getElementById('questionModal');
+        if (event.target == modal) {
+            closeModal();
+        }
+    }
+</script>
+{% endblock %}

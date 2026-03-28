@@ -1,0 +1,393 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if question %}
+        Frage bearbeiten - {{ catalog.name }}
+    {% else %}
+        Neue Frage - {{ catalog.name }}
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="question-form-container">
+    <h2>
+        {% if question %}
+            Frage bearbeiten: {{ question.id }}
+        {% else %}
+            Neue Frage erstellen
+        {% endif %}
+    </h2>
+    <p class="catalog-info">Katalog: <strong>{{ catalog.name }}</strong></p>
+
+    <form method="POST" class="question-form" id="questionForm">
+        <!-- Fragentyp-Auswahl -->
+        <div class="form-group">
+            <label for="question_type">Fragentyp *</label>
+            <select id="question_type" name="question_type" required onchange="updateFormFields()">
+                <option value="single" {% if not question or question.question_type == 'single' %}selected{% endif %}>
+                    Single Choice (Eine richtige Antwort)
+                </option>
+                <option value="multiple" {% if question and question.question_type == 'multiple' %}selected{% endif %}>
+                    Multiple Choice (Mehrere richtige Antworten)
+                </option>
+                <option value="text" {% if question and question.question_type == 'text' %}selected{% endif %}>
+                    Freitext (Textantwort)
+                </option>
+            </select>
+        </div>
+
+        <!-- Fragentext -->
+        <div class="form-group">
+            <label for="question">Fragentext *</label>
+            <textarea
+                id="question"
+                name="question"
+                rows="4"
+                required
+                placeholder="Geben Sie hier die Frage ein..."
+            >{{ question.question if question else '' }}</textarea>
+        </div>
+
+        <!-- Kategorie -->
+        <div class="form-group">
+            <label for="category">Kategorie (optional)</label>
+            <input
+                type="text"
+                id="category"
+                name="category"
+                value="{{ question.category if question else '' }}"
+                placeholder="z.B. Product Owner, Scrum Master"
+            >
+        </div>
+
+        <!-- Subkategorie -->
+        <div class="form-group">
+            <label for="subcategory">Subkategorie (optional)</label>
+            <input
+                type="text"
+                id="subcategory"
+                name="subcategory"
+                value="{{ question.subcategory if question else '' }}"
+                placeholder="z.B. MUST, CAN, SHOULD"
+            >
+        </div>
+
+        <!-- Antwortoptionen für Single/Multiple Choice -->
+        <div id="optionsSection" style="display: none;">
+            <h3>Antwortoptionen</h3>
+
+            <!-- Single Choice: Option A mit Radio -->
+            <div class="form-group option-with-selector" id="singleChoiceSection" style="display: none;">
+                <div class="option-row">
+                    <div class="option-input-wrapper">
+                        <label for="option_a">Option A *</label>
+                        <input
+                            type="text"
+                            id="option_a"
+                            name="option_a"
+                            value="{% if question and question.options %}{{ question.options.A }}{% endif %}"
+                            placeholder="Antwort A"
+                        >
+                    </div>
+                    <div class="correct-selector">
+                        <label>
+                            <input type="radio" name="correct_answer" value="A"
+                                {% if question and question.correct_answer == 'A' %}checked{% endif %}>
+                            Richtig
+                        </label>
+                    </div>
+                </div>
+
+                <div class="option-row">
+                    <div class="option-input-wrapper">
+                        <label for="option_b">Option B *</label>
+                        <input
+                            type="text"
+                            id="option_b"
+                            name="option_b"
+                            value="{% if question and question.options %}{{ question.options.B }}{% endif %}"
+                            placeholder="Antwort B"
+                        >
+                    </div>
+                    <div class="correct-selector">
+                        <label>
+                            <input type="radio" name="correct_answer" value="B"
+                                {% if question and question.correct_answer == 'B' %}checked{% endif %}>
+                            Richtig
+                        </label>
+                    </div>
+                </div>
+
+                <div class="option-row">
+                    <div class="option-input-wrapper">
+                        <label for="option_c">Option C *</label>
+                        <input
+                            type="text"
+                            id="option_c"
+                            name="option_c"
+                            value="{% if question and question.options %}{{ question.options.C }}{% endif %}"
+                            placeholder="Antwort C"
+                        >
+                    </div>
+                    <div class="correct-selector">
+                        <label>
+                            <input type="radio" name="correct_answer" value="C"
+                                {% if question and question.correct_answer == 'C' %}checked{% endif %}>
+                            Richtig
+                        </label>
+                    </div>
+                </div>
+
+                <div class="option-row">
+                    <div class="option-input-wrapper">
+                        <label for="option_d">Option D *</label>
+                        <input
+                            type="text"
+                            id="option_d"
+                            name="option_d"
+                            value="{% if question and question.options %}{{ question.options.D }}{% endif %}"
+                            placeholder="Antwort D"
+                        >
+                    </div>
+                    <div class="correct-selector">
+                        <label>
+                            <input type="radio" name="correct_answer" value="D"
+                                {% if question and question.correct_answer == 'D' %}checked{% endif %}>
+                            Richtig
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Multiple Choice: Optionen mit Checkboxen -->
+            <div class="form-group option-with-selector" id="multipleChoiceSection" style="display: none;">
+                <div class="option-row">
+                    <div class="option-input-wrapper">
+                        <label for="option_a_multi">Option A *</label>
+                        <input
+                            type="text"
+                            id="option_a_multi"
+                            name="option_a"
+                            value="{% if question and question.options %}{{ question.options.A }}{% endif %}"
+                            placeholder="Antwort A"
+                        >
+                    </div>
+                    <div class="correct-selector">
+                        <label>
+                            <input type="checkbox" name="correct_answers" value="A"
+                                {% if question and question.correct_answer and 'A' in question.correct_answer %}checked{% endif %}>
+                            Richtig
+                        </label>
+                    </div>
+                </div>
+
+                <div class="option-row">
+                    <div class="option-input-wrapper">
+                        <label for="option_b_multi">Option B *</label>
+                        <input
+                            type="text"
+                            id="option_b_multi"
+                            name="option_b"
+                            value="{% if question and question.options %}{{ question.options.B }}{% endif %}"
+                            placeholder="Antwort B"
+                        >
+                    </div>
+                    <div class="correct-selector">
+                        <label>
+                            <input type="checkbox" name="correct_answers" value="B"
+                                {% if question and question.correct_answer and 'B' in question.correct_answer %}checked{% endif %}>
+                            Richtig
+                        </label>
+                    </div>
+                </div>
+
+                <div class="option-row">
+                    <div class="option-input-wrapper">
+                        <label for="option_c_multi">Option C *</label>
+                        <input
+                            type="text"
+                            id="option_c_multi"
+                            name="option_c"
+                            value="{% if question and question.options %}{{ question.options.C }}{% endif %}"
+                            placeholder="Antwort C"
+                        >
+                    </div>
+                    <div class="correct-selector">
+                        <label>
+                            <input type="checkbox" name="correct_answers" value="C"
+                                {% if question and question.correct_answer and 'C' in question.correct_answer %}checked{% endif %}>
+                            Richtig
+                        </label>
+                    </div>
+                </div>
+
+                <div class="option-row">
+                    <div class="option-input-wrapper">
+                        <label for="option_d_multi">Option D *</label>
+                        <input
+                            type="text"
+                            id="option_d_multi"
+                            name="option_d"
+                            value="{% if question and question.options %}{{ question.options.D }}{% endif %}"
+                            placeholder="Antwort D"
+                        >
+                    </div>
+                    <div class="correct-selector">
+                        <label>
+                            <input type="checkbox" name="correct_answers" value="D"
+                                {% if question and question.correct_answer and 'D' in question.correct_answer %}checked{% endif %}>
+                            Richtig
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Beispielantwort für Freitext -->
+        <div id="textSection" style="display: none;">
+            <div class="form-group">
+                <label for="sample_answer">Beispielantwort *</label>
+                <textarea
+                    id="sample_answer"
+                    name="sample_answer"
+                    rows="4"
+                    placeholder="Geben Sie eine Beispielantwort ein..."
+                >{{ question.sample_answer if question else '' }}</textarea>
+            </div>
+        </div>
+
+        <!-- Erklärung -->
+        <div class="form-group">
+            <label for="explanation">Erklärung (optional)</label>
+            <textarea
+                id="explanation"
+                name="explanation"
+                rows="8"
+                placeholder="Erklärung zur richtigen Antwort..."
+            >{{ question.explanation if question else '' }}</textarea>
+        </div>
+
+        <!-- Buttons -->
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">
+                {% if question %}Speichern{% else %}Erstellen{% endif %}
+            </button>
+            <a href="{{ url_for('questions.catalog_questions', catalog_id=catalog.id) }}" class="btn btn-secondary">
+                Abbrechen
+            </a>
+        </div>
+    </form>
+</div>
+
+<style>
+/* Option Rows - Antwort und Checkbox nebeneinander */
+.option-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.option-input-wrapper {
+    flex: 1;
+}
+
+.option-input-wrapper input[type="text"] {
+    height: 45px;
+    font-size: 15px;
+    padding: 12px;
+}
+
+.correct-selector {
+    min-width: 100px;
+    padding-bottom: 10px;
+}
+
+.correct-selector label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: #667eea;
+    cursor: pointer;
+}
+
+.correct-selector input[type="radio"],
+.correct-selector input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+/* Größere Textareas für Frage und Erklärung */
+.question-form textarea {
+    font-size: 15px;
+    padding: 12px;
+    line-height: 1.5;
+}
+</style>
+
+<script>
+function updateFormFields() {
+    const questionType = document.getElementById('question_type').value;
+    const optionsSection = document.getElementById('optionsSection');
+    const singleChoiceSection = document.getElementById('singleChoiceSection');
+    const multipleChoiceSection = document.getElementById('multipleChoiceSection');
+    const textSection = document.getElementById('textSection');
+
+    // Alle Optionen-Inputs (single und multiple)
+    const singleOptionInputs = ['option_a', 'option_b', 'option_c', 'option_d'];
+    const multipleOptionInputs = ['option_a_multi', 'option_b_multi', 'option_c_multi', 'option_d_multi'];
+    const sampleAnswerInput = document.getElementById('sample_answer');
+
+    if (questionType === 'single') {
+        optionsSection.style.display = 'block';
+        singleChoiceSection.style.display = 'block';
+        multipleChoiceSection.style.display = 'none';
+        textSection.style.display = 'none';
+
+        // Required setzen
+        singleOptionInputs.forEach(id => {
+            document.getElementById(id).required = true;
+        });
+        multipleOptionInputs.forEach(id => {
+            document.getElementById(id).required = false;
+        });
+        sampleAnswerInput.required = false;
+
+    } else if (questionType === 'multiple') {
+        optionsSection.style.display = 'block';
+        singleChoiceSection.style.display = 'none';
+        multipleChoiceSection.style.display = 'block';
+        textSection.style.display = 'none';
+
+        // Required setzen
+        singleOptionInputs.forEach(id => {
+            document.getElementById(id).required = false;
+        });
+        multipleOptionInputs.forEach(id => {
+            document.getElementById(id).required = true;
+        });
+        sampleAnswerInput.required = false;
+
+    } else if (questionType === 'text') {
+        optionsSection.style.display = 'none';
+        singleChoiceSection.style.display = 'none';
+        multipleChoiceSection.style.display = 'none';
+        textSection.style.display = 'block';
+
+        // Required setzen
+        singleOptionInputs.forEach(id => {
+            document.getElementById(id).required = false;
+        });
+        multipleOptionInputs.forEach(id => {
+            document.getElementById(id).required = false;
+        });
+        sampleAnswerInput.required = true;
+    }
+}
+
+// Initial setup beim Laden
+document.addEventListener('DOMContentLoaded', updateFormFields);
+</script>
+{% endblock %}

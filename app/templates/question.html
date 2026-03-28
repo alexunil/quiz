@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Frage {{ index + 1 }} - Quiz-App{% endblock %}
+
+{% block content %}
+{% set quiz_mode = quiz_mode|default('pruefen') %}
+<div class="quiz-container">
+    <div class="progress-info">
+        <div class="progress-header">
+            <span class="question-counter">Frage {{ index + 1 }} von {{ total }}</span>
+            <span class="score-counter">Richtig: {{ correct_count }}</span>
+            <span class="mode-badge mode-badge-{{ quiz_mode }}">
+                {% if quiz_mode == 'ueben' %}📚 Üben{% else %}⏱️ Prüfen{% endif %}
+            </span>
+            {% if time_info %}
+                <span class="timer-display" id="timer-display" data-remaining="{{ time_info.remaining_seconds }}">
+                    Zeit: <span id="timer-value">{{ time_info.remaining_seconds }}</span>s
+                </span>
+            {% endif %}
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ ((index) / total * 100)|round }}%"></div>
+        </div>
+    </div>
+
+    <div class="question-box">
+        <div class="category-badge">
+            <span class="category">{{ question.category }}</span>
+            {% if question.subcategory %}
+                <span class="subcategory">{{ question.subcategory }}</span>
+            {% endif %}
+        </div>
+
+        <h2 class="question-text">{{ question.question }}</h2>
+
+        <form action="{{ url_for('main.answer', index=index) }}" method="post" class="answer-form">
+            {% if question.question_type == 'text' %}
+                <!-- Text Input Question -->
+                <div class="text-input-container">
+                    <p class="text-hint">Bitte geben Sie Ihre Antwort im Textfeld ein. Diese Frage wird nicht automatisch bewertet.</p>
+                    <textarea name="text_answer" id="text_answer" rows="8" class="text-answer-field" required placeholder="Ihre Antwort hier eingeben..."></textarea>
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">Antwort speichern</button>
+                </div>
+
+            {% elif question.question_type == 'multiple' %}
+                <!-- Multiple Choice Question -->
+                <p class="multiple-hint"><strong>Hinweis:</strong> Mehrere Antworten möglich. Bitte wählen Sie alle zutreffenden Optionen aus.</p>
+                <div class="options">
+                    {% for key, value in question.options.items() %}
+                    <div class="option option-checkbox">
+                        <input type="checkbox" id="option_{{ key }}" name="answer" value="{{ key }}">
+                        <label for="option_{{ key }}">
+                            <span class="option-letter">{{ key }}</span>
+                            <span class="option-text">{{ value }}</span>
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">Antwort abgeben</button>
+                    <form action="{{ url_for('main.defer_question', index=index) }}" method="post" style="display: inline;">
+                        <button type="submit" class="btn btn-secondary">Zurückstellen</button>
+                    </form>
+                </div>
+
+            {% else %}
+                <!-- Single Choice Question (default) -->
+                <div class="options">
+                    {% for key, value in question.options.items() %}
+                    <div class="option">
+                        <input type="radio" id="option_{{ key }}" name="answer" value="{{ key }}" required>
+                        <label for="option_{{ key }}">
+                            <span class="option-letter">{{ key }}</span>
+                            <span class="option-text">{{ value }}</span>
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+                <div class="button-group">
+                    <button type="submit" class="btn btn-primary">Antwort abgeben</button>
+                    <form action="{{ url_for('main.defer_question', index=index) }}" method="post" style="display: inline;">
+                        <button type="submit" class="btn btn-secondary">Zurückstellen</button>
+                    </form>
+                </div>
+            {% endif %}
+        </form>
+    </div>
+</div>
+
+{% if time_info %}
+<script>
+    // Countdown-Timer für Multiple Choice Fragen
+    let remainingSeconds = {{ time_info.remaining_seconds }};
+    const timerDisplay = document.getElementById('timer-value');
+    const timerContainer = document.getElementById('timer-display');
+
+    let timeExpiredAlertShown = false;
+
+    function updateTimer() {
+        if (remainingSeconds > 0) {
+            remainingSeconds--;
+            timerDisplay.textContent = remainingSeconds;
+
+            // Warnung bei wenig Zeit (< 60 Sekunden)
+            if (remainingSeconds <= 60 && remainingSeconds > 30) {
+                timerContainer.style.color = '#ff9800';
+                timerContainer.style.fontWeight = 'bold';
+            } else if (remainingSeconds <= 30) {
+                timerContainer.style.color = '#f44336';
+                timerContainer.style.fontWeight = 'bold';
+                timerContainer.style.animation = 'pulse 1s infinite';
+            }
+        } else if (remainingSeconds === 0 && !timeExpiredAlertShown) {
+            // Zeit abgelaufen - nur Warnung, Quiz läuft weiter
+            timerDisplay.textContent = '0';
+            timerContainer.style.color = '#f44336';
+            timerContainer.style.fontWeight = 'bold';
+            alert('⏰ Die Zeit ist abgelaufen! Sie können das Quiz fortsetzen, aber weitere Antworten zählen als falsch.');
+            timeExpiredAlertShown = true;
+            remainingSeconds--; // Verhindert mehrfache Alerts
+        }
+    }
+
+    // Timer alle Sekunde aktualisieren
+    setInterval(updateTimer, 1000);
+</script>
+
+<style>
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    .timer-display {
+        font-size: 1.1em;
+        padding: 0.5em 1em;
+        background-color: #e3f2fd;
+        border-radius: 4px;
+    }
+
+    .button-group {
+        display: flex;
+        gap: 1em;
+        margin-top: 1em;
+    }
+
+    .btn-secondary {
+        background-color: #757575;
+        color: white;
+        border: none;
+        padding: 0.75em 1.5em;
+        font-size: 1em;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+    }
+
+    .btn-secondary:hover {
+        background-color: #616161;
+    }
+</style>
+{% endif %}
+
+<style>
+    .mode-badge {
+        font-size: 0.85em;
+        padding: 0.3em 0.8em;
+        border-radius: 12px;
+        font-weight: 600;
+    }
+    .mode-badge-ueben {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+        border: 1px solid #a5d6a7;
+    }
+    .mode-badge-pruefen {
+        background-color: #fff3e0;
+        color: #e65100;
+        border: 1px solid #ffcc80;
+    }
+</style>
+{% endblock %}

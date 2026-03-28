@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Feedback - Quiz-App{% endblock %}
+
+{% block content %}
+<div class="quiz-container">
+    <div class="progress-info">
+        <div class="progress-header">
+            <span class="question-counter">Frage {{ index + 1 }} von {{ total }}</span>
+            <span class="score-counter">Richtig: {{ correct_count }}</span>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: {{ ((index + 1) / total * 100)|round }}%"></div>
+        </div>
+    </div>
+
+    {% if question.question_type == 'text' %}
+        <!-- Feedback for Text Questions with AI Evaluation -->
+        <div class="feedback-box {% if is_correct is none %}feedback-neutral{% elif is_correct %}feedback-correct{% else %}feedback-incorrect{% endif %}">
+            <div class="feedback-icon">
+                {% if is_correct is none %}
+                    <span class="icon-saved">💾</span>
+                    <h2>Antwort gespeichert</h2>
+                {% elif is_correct %}
+                    <span class="icon-correct">✓</span>
+                    <h2>Richtig!</h2>
+                    <p class="ai-badge">🤖 KI-Bewertung</p>
+                {% else %}
+                    <span class="icon-incorrect">✗</span>
+                    <h2>Leider falsch</h2>
+                    <p class="ai-badge">🤖 KI-Bewertung</p>
+                {% endif %}
+            </div>
+
+            <div class="question-review">
+                <h3>{{ question.question }}</h3>
+
+                <div class="text-answer-display">
+                    <strong>Ihre Antwort:</strong>
+                    <div class="text-answer-box">{{ selected_answer }}</div>
+                </div>
+
+                {% if ai_reasoning %}
+                <div class="ai-evaluation">
+                    <h4>🤖 KI-Bewertung:</h4>
+                    <p>{{ ai_reasoning }}</p>
+                </div>
+                {% endif %}
+
+                {% if question.sample_answer %}
+                <div class="explanation">
+                    <h4>Beispielantwort:</h4>
+                    <p>{{ question.sample_answer }}</p>
+                </div>
+                {% endif %}
+
+                {% if question.explanation %}
+                <div class="explanation">
+                    <h4>Erläuterung:</h4>
+                    <p>{{ question.explanation }}</p>
+                </div>
+                {% endif %}
+
+                {% if is_correct is none %}
+                    <p class="text-note"><em>Diese Frage konnte nicht automatisch bewertet werden.</em></p>
+                {% endif %}
+            </div>
+
+            <form action="{{ url_for('main.next_question', index=index) }}" method="post">
+                {% if index + 1 < total %}
+                    <button type="submit" class="btn btn-primary">Nächste Frage</button>
+                {% else %}
+                    <button type="submit" class="btn btn-success">Zur Zusammenfassung</button>
+                {% endif %}
+            </form>
+        </div>
+
+    {% else %}
+        <!-- Feedback for Single/Multiple Choice Questions -->
+        <div class="feedback-box {% if is_correct %}feedback-correct{% else %}feedback-incorrect{% endif %}">
+            <div class="feedback-icon">
+                {% if is_correct %}
+                    <span class="icon-correct">✓</span>
+                    <h2>Richtig!</h2>
+                {% else %}
+                    <span class="icon-incorrect">✗</span>
+                    <h2>Leider falsch</h2>
+                {% endif %}
+            </div>
+
+            <div class="question-review">
+                <h3>{{ question.question }}</h3>
+
+                {% if answered_after_timeout %}
+                <div class="timeout-warning">
+                    <p>⏰ <strong>Nach Zeitablauf beantwortet</strong> - Diese Antwort zählt als falsch.</p>
+                </div>
+                {% endif %}
+
+                <div class="answer-comparison">
+                    <div class="answer-row">
+                        <strong>Ihre Antwort:</strong>
+                        <span class="answer {% if is_correct %}correct{% else %}incorrect{% endif %}">
+                            {% if question.question_type == 'multiple' %}
+                                {% if selected_answer is string %}
+                                    {% set selected_list = selected_answer.split(',') %}
+                                {% else %}
+                                    {% set selected_list = selected_answer %}
+                                {% endif %}
+                                {% for ans in selected_list %}
+                                    {{ ans }}: {{ question.options[ans] }}{% if not loop.last %}<br>{% endif %}
+                                {% endfor %}
+                            {% else %}
+                                {{ selected_answer }}: {{ question.options[selected_answer] }}
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    {% if not is_correct %}
+                    <div class="answer-row">
+                        <strong>Richtige Antwort:</strong>
+                        <span class="answer correct">
+                            {% if question.question_type == 'multiple' %}
+                                {% for ans in question.correct_answer %}
+                                    {{ ans }}: {{ question.options[ans] }}{% if not loop.last %}<br>{% endif %}
+                                {% endfor %}
+                            {% else %}
+                                {{ question.correct_answer }}: {{ question.options[question.correct_answer] }}
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="explanation">
+                    <h4>Erklärung:</h4>
+                    <p>{{ question.explanation }}</p>
+                </div>
+            </div>
+
+            <form action="{{ url_for('main.next_question', index=index) }}" method="post">
+                {% if index + 1 < total %}
+                    <button type="submit" class="btn btn-primary">Nächste Frage</button>
+                {% else %}
+                    <button type="submit" class="btn btn-success">Zur Zusammenfassung</button>
+                {% endif %}
+            </form>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

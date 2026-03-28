@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Zusammenfassung - Quiz-App{% endblock %}
+
+{% block content %}
+<div class="summary-container">
+    <h2>Quiz abgeschlossen!</h2>
+
+    <div class="score-summary">
+        <div class="score-circle">
+            <div class="percentage">{{ stats.percentage }}%</div>
+            <div class="score-text">{{ stats.correct }} von {{ stats.total }} richtig</div>
+        </div>
+
+        <div class="score-breakdown">
+            <div class="stat-item stat-correct">
+                <span class="stat-label">Richtig:</span>
+                <span class="stat-value">{{ stats.correct }}</span>
+            </div>
+            <div class="stat-item stat-incorrect">
+                <span class="stat-label">Falsch:</span>
+                <span class="stat-value">{{ stats.incorrect }}</span>
+            </div>
+        </div>
+    </div>
+
+    {% if stats.text_responses %}
+    <div class="text-responses-notice">
+        <p><em>Hinweis: {{ stats.text_responses|length }} Freitextfrage(n) wurden nicht bewertet und zählen nicht zur Statistik.</em></p>
+    </div>
+    {% endif %}
+
+    {% if stats.category_stats %}
+    <div class="category-stats">
+        <h3>Ergebnisse nach Kategorie:</h3>
+        <table class="stats-table">
+            <thead>
+                <tr>
+                    <th>Kategorie</th>
+                    <th>Richtig</th>
+                    <th>Gesamt</th>
+                    <th>Prozent</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for category, data in stats.category_stats.items() %}
+                <tr>
+                    <td>{{ category }}</td>
+                    <td>{{ data.correct }}</td>
+                    <td>{{ data.total }}</td>
+                    <td>{{ ((data.correct / data.total * 100)|round)|int }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    {% if stats.subcategory_stats %}
+    <div class="subcategory-stats">
+        <h3>Ergebnisse nach Subkategorie:</h3>
+        <table class="stats-table">
+            <thead>
+                <tr>
+                    <th>Subkategorie</th>
+                    <th>Richtig</th>
+                    <th>Gesamt</th>
+                    <th>Prozent</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for subcategory, data in stats.subcategory_stats.items() %}
+                <tr>
+                    <td>{{ subcategory }}</td>
+                    <td>{{ data.correct }}</td>
+                    <td>{{ data.total }}</td>
+                    <td>{{ ((data.correct / data.total * 100)|round)|int }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <div class="question-review-section">
+        <h3>Bewertete Fragen im Überblick:</h3>
+
+        {% for response in stats.responses %}
+        <div class="review-item {% if response.is_correct %}review-correct{% else %}review-incorrect{% endif %}">
+            <div class="review-header">
+                <span class="review-icon">
+                    {% if response.is_correct %}✓{% else %}✗{% endif %}
+                </span>
+                <span class="review-category">{{ response.category }}{% if response.subcategory %} - {{ response.subcategory }}{% endif %}</span>
+                <span class="review-type-badge">{{ response.question_type }}</span>
+            </div>
+
+            <div class="review-question">
+                <strong>Frage:</strong> {{ response.question_text }}
+            </div>
+
+            <div class="review-answers">
+                <div>
+                    <strong>Ihre Antwort:</strong>
+                    <span class="{% if response.is_correct %}text-correct{% else %}text-incorrect{% endif %}">
+                        {{ response.selected_answer }}
+                    </span>
+                </div>
+                {% if not response.is_correct %}
+                <div>
+                    <strong>Richtige Antwort:</strong>
+                    <span class="text-correct">{{ response.correct_answer }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if stats.text_responses %}
+    <div class="text-questions-section">
+        <h3>Freitextfragen (nicht bewertet):</h3>
+
+        {% for response in stats.text_responses %}
+        <div class="review-item review-neutral">
+            <div class="review-header">
+                <span class="review-icon">💾</span>
+                <span class="review-category">{{ response.category }}{% if response.subcategory %} - {{ response.subcategory }}{% endif %}</span>
+                <span class="review-type-badge">text</span>
+            </div>
+
+            <div class="review-question">
+                <strong>Frage:</strong> {{ response.question_text }}
+            </div>
+
+            <div class="review-answers">
+                <div>
+                    <strong>Ihre Antwort:</strong>
+                    <div class="text-answer-display">{{ response.selected_answer }}</div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="summary-actions">
+        <form action="{{ url_for('main.start_quiz') }}" method="post">
+            <button type="submit" class="btn btn-primary btn-large">Neues Quiz starten</button>
+        </form>
+        <a href="{{ url_for('main.index') }}" class="btn btn-secondary">Zur Startseite</a>
+    </div>
+</div>
+{% endblock %}

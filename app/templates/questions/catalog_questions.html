@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Fragen: {{ catalog.name }} - Scrum Quiz{% endblock %}
+
+{% block content %}
+<div class="questions-container">
+    <div class="questions-header">
+        <h2>Fragen: {{ catalog.name }}</h2>
+        <p class="catalog-description">{{ catalog.description or 'Keine Beschreibung' }}</p>
+    </div>
+
+    <div class="questions-actions">
+        <a href="{{ url_for('questions.new_question', catalog_id=catalog.id) }}" class="btn btn-primary">
+            Neue Frage erstellen
+        </a>
+        <a href="{{ url_for('catalogs.manage') }}" class="btn btn-secondary">
+            Zurück zu Katalogen
+        </a>
+    </div>
+
+    <div class="questions-stats">
+        <p><strong>Anzahl Fragen:</strong> {{ questions|length }}</p>
+    </div>
+
+    {% if questions %}
+        <div class="questions-list">
+            {% for question in questions %}
+                <div class="question-item question-type-{{ question.question_type or 'single' }}">
+                    <div class="question-header">
+                        <div class="question-id">
+                            <span class="badge badge-type">
+                                {% if question.question_type == 'multiple' %}
+                                    Multiple Choice
+                                {% elif question.question_type == 'text' %}
+                                    Freitext
+                                {% else %}
+                                    Single Choice
+                                {% endif %}
+                            </span>
+                            <code>{{ question.id }}</code>
+                        </div>
+                        <div class="question-meta">
+                            {% if question.category %}
+                                <span class="badge badge-category">{{ question.category }}</span>
+                            {% endif %}
+                            {% if question.subcategory %}
+                                <span class="badge badge-subcategory">{{ question.subcategory }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="question-text">
+                        <strong>Frage:</strong> {{ question.question }}
+                    </div>
+
+                    {% if question.question_type in ['single', 'multiple'] and question.options %}
+                        <div class="question-options">
+                            <strong>Antworten:</strong>
+                            <ul>
+                                {% for key, value in question.options.items() %}
+                                    <li>
+                                        <strong>{{ key }}:</strong> {{ value }}
+                                        {% if question.question_type == 'single' and question.correct_answer == key %}
+                                            <span class="correct-mark">✓ Richtig</span>
+                                        {% elif question.question_type == 'multiple' and key in question.correct_answer %}
+                                            <span class="correct-mark">✓ Richtig</span>
+                                        {% endif %}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% elif question.question_type == 'text' %}
+                        <div class="question-sample">
+                            <strong>Beispielantwort:</strong> {{ question.sample_answer or 'Keine Beispielantwort' }}
+                        </div>
+                    {% endif %}
+
+                    {% if question.explanation %}
+                        <div class="question-explanation">
+                            <strong>Erklärung:</strong> {{ question.explanation }}
+                        </div>
+                    {% endif %}
+
+                    <div class="question-actions">
+                        <a href="{{ url_for('questions.edit_question', catalog_id=catalog.id, question_id=question.id) }}"
+                           class="btn btn-sm btn-secondary">
+                            Bearbeiten
+                        </a>
+                        <form method="POST"
+                              action="{{ url_for('questions.delete_question', catalog_id=catalog.id, question_id=question.id) }}"
+                              onsubmit="return confirm('Frage &quot;{{ question.id }}&quot; wirklich löschen?');"
+                              style="display: inline;">
+                            <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <p>Dieser Katalog enthält noch keine Fragen.</p>
+            <a href="{{ url_for('questions.new_question', catalog_id=catalog.id) }}" class="btn btn-primary">
+                Erste Frage erstellen
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

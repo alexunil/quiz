@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Katalog bearbeiten - Scrum Quiz{% endblock %}
+
+{% block content %}
+<div class="catalog-form-container">
+    <h2>Katalog bearbeiten</h2>
+
+    <form method="POST" class="catalog-form">
+        <div class="form-group">
+            <label for="name">Katalogname *</label>
+            <input
+                type="text"
+                id="name"
+                name="name"
+                required
+                maxlength="200"
+                value="{{ catalog.name }}"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="description">Beschreibung (optional)</label>
+            <textarea
+                id="description"
+                name="description"
+                rows="3"
+                placeholder="Beschreiben Sie den Inhalt dieses Katalogs..."
+            >{{ catalog.description or '' }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="time_per_question">Zeit pro Frage (Sekunden) *</label>
+            <input
+                type="number"
+                id="time_per_question"
+                name="time_per_question"
+                required
+                min="10"
+                max="300"
+                value="{{ catalog.time_per_question }}"
+            >
+            <small class="form-help">Nach Zeitablauf können Fragen noch beantwortet werden, zählen aber als falsch.</small>
+        </div>
+
+        <div class="info-box">
+            <p><strong>Fragen:</strong> {{ catalog.question_count }}</p>
+            <p><strong>Erstellt:</strong> {{ catalog.created_at.strftime('%d.%m.%Y %H:%M') }} Uhr</p>
+            <p><strong>Zuletzt aktualisiert:</strong> {{ catalog.updated_at.strftime('%d.%m.%Y %H:%M') }} Uhr</p>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Speichern</button>
+            <a href="{{ url_for('catalogs.manage') }}" class="btn btn-secondary">Abbrechen</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

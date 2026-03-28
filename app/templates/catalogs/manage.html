@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Kataloge verwalten - Scrum Quiz{% endblock %}
+
+{% block content %}
+<div class="catalogs-container">
+    <h2>Meine Fragenkataloge</h2>
+
+    <div class="catalog-actions">
+        <a href="{{ url_for('catalogs.create') }}" class="btn btn-primary">Neuer Katalog</a>
+        <a href="{{ url_for('catalogs.import_catalog') }}" class="btn btn-secondary">Katalog importieren</a>
+    </div>
+
+    {% if catalogs %}
+        <div class="catalog-list">
+            {% for catalog in catalogs %}
+                <div class="catalog-item {% if catalog.is_active %}active{% endif %}">
+                    <div class="catalog-header">
+                        <h3>
+                            {{ catalog.name }}
+                            {% if catalog.is_active %}
+                                <span class="badge badge-success">Aktiv</span>
+                            {% endif %}
+                        </h3>
+                        <div class="catalog-meta">
+                            <span>{{ catalog.question_count }} Fragen</span>
+                            <span>Erstellt: {{ catalog.created_at.strftime('%d.%m.%Y') }}</span>
+                        </div>
+                    </div>
+
+                    {% if catalog.description %}
+                        <p class="catalog-description">{{ catalog.description }}</p>
+                    {% endif %}
+
+                    <div class="catalog-actions-row">
+                        {% if not catalog.is_active %}
+                            <form method="POST" action="{{ url_for('catalogs.activate', catalog_id=catalog.id) }}" style="display: inline;">
+                                <button type="submit" class="btn btn-sm btn-success">Aktivieren</button>
+                            </form>
+                        {% endif %}
+
+                        <a href="{{ url_for('questions.catalog_questions', catalog_id=catalog.id) }}" class="btn btn-sm btn-primary">Fragen bearbeiten</a>
+                        <a href="{{ url_for('catalogs.edit', catalog_id=catalog.id) }}" class="btn btn-sm btn-secondary">Bearbeiten</a>
+                        <a href="{{ url_for('catalogs.export', catalog_id=catalog.id) }}" class="btn btn-sm btn-info">Exportieren</a>
+
+                        <form method="POST" action="{{ url_for('catalogs.delete', catalog_id=catalog.id) }}"
+                              onsubmit="return confirm('Katalog &quot;{{ catalog.name }}&quot; wirklich löschen? Alle Gewichtungen gehen verloren!');"
+                              style="display: inline;">
+                            <button type="submit" class="btn btn-sm btn-danger">Löschen</button>
+                        </form>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <p>Sie haben noch keine Fragenkataloge.</p>
+            <p>
+                <a href="{{ url_for('catalogs.create') }}" class="btn btn-primary">Ersten Katalog erstellen</a>
+                oder
+                <a href="{{ url_for('catalogs.import_catalog') }}" class="btn btn-secondary">Katalog importieren</a>
+            </p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

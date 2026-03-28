@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Modus wählen - Quiz-App{% endblock %}
+
+{% block content %}
+<div class="mode-select-container">
+    <h2>Quiz starten</h2>
+
+    {% if active_catalog %}
+    <div class="catalog-info-box">
+        <strong>Aktiver Katalog:</strong> {{ active_catalog.name }}
+        {% if active_catalog.description %}
+        <p class="catalog-desc">{{ active_catalog.description }}</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="ai-status-box {% if ai_available %}ai-ok{% else %}ai-unavailable{% endif %}">
+        {% if ai_available %}
+        <span class="ai-status-icon">✓</span> KI-Bewertung verfügbar
+        {% else %}
+        <span class="ai-status-icon">✗</span> Kein Internet – KI nicht verfügbar.
+        {% if text_question_count > 0 %}
+        <br><small>{{ text_question_count }} Freitext-Frage(n) werden in dieser Sitzung ausgelassen.</small>
+        {% endif %}
+        {% endif %}
+    </div>
+
+    <div class="mode-cards">
+        <div class="mode-card">
+            <div class="mode-icon">📚</div>
+            <h3>Üben</h3>
+            <p>Ohne Zeitbegrenzung – ideal zum Lernen und Wiederholen.</p>
+            <form action="{{ url_for('main.start_quiz') }}" method="post">
+                <input type="hidden" name="mode" value="ueben">
+                <button type="submit" class="btn btn-mode btn-ueben">Üben starten</button>
+            </form>
+        </div>
+
+        <div class="mode-card">
+            <div class="mode-icon">⏱️</div>
+            <h3>Prüfen</h3>
+            <p>Mit Zeitbegrenzung – realistische Prüfungssimulation.</p>
+            <form action="{{ url_for('main.start_quiz') }}" method="post">
+                <input type="hidden" name="mode" value="pruefen">
+                <button type="submit" class="btn btn-mode btn-pruefen">Prüfung starten</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
