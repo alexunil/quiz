@@ -145,9 +145,7 @@
     {% endif %}
 
     <div class="summary-actions">
-        <form action="{{ url_for('main.start_quiz') }}" method="post">
-            <button type="submit" class="btn btn-primary btn-large">Neues Quiz starten</button>
-        </form>
+        <a href="{{ url_for('main.mode_select') }}" class="btn btn-primary btn-large">Neues Quiz starten</a>
         <a href="{{ url_for('main.index') }}" class="btn btn-secondary">Zur Startseite</a>
     </div>
 </div>
