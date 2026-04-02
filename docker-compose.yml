@@ -1,0 +1,11 @@
+services:
+  quiz:
+    build: .
+    ports:
+      - "5009:5009"
+    volumes:
+      - ./instance:/app/instance
+      - ./data/catalogs:/app/data/catalogs
+    env_file:
+      - .env
+    restart: unless-stopped

@@ -38,21 +38,21 @@ def load_questions_for_user(user_id):
 
     # Fragen aus Katalog-Datei laden
     try:
-        if not os.path.exists(catalog.file_path):
-            current_app.logger.error(f"Katalog-Datei nicht gefunden: {catalog.file_path}")
+        if not os.path.exists(catalog.abs_file_path):
+            current_app.logger.error(f"Katalog-Datei nicht gefunden: {catalog.abs_file_path}")
             return [], catalog.id
 
-        with open(catalog.file_path, 'r', encoding='utf-8') as f:
+        with open(catalog.abs_file_path, 'r', encoding='utf-8') as f:
             questions = json.load(f)
 
             if not isinstance(questions, list):
-                current_app.logger.error(f"Ungültiges Katalog-Format: {catalog.file_path}")
+                current_app.logger.error(f"Ungültiges Katalog-Format: {catalog.abs_file_path}")
                 return [], catalog.id
 
             return questions, catalog.id
 
     except json.JSONDecodeError:
-        current_app.logger.error(f"Fehler beim Parsen der Katalog-Datei: {catalog.file_path}")
+        current_app.logger.error(f"Fehler beim Parsen der Katalog-Datei: {catalog.abs_file_path}")
         return [], catalog.id
     except Exception as e:
         current_app.logger.error(f"Fehler beim Laden des Katalogs: {str(e)}")
@@ -126,6 +126,23 @@ def select_random_questions(n=None, user_id=None, catalog_id=None, questions=Non
             selected = random.sample(all_questions, n)
 
     return selected
+
+
+def get_question_from_catalog(catalog_id, question_id):
+    """Lädt eine einzelne Frage aus einem spezifischen Katalog per ID"""
+    from app.models import QuestionCatalog
+    catalog = QuestionCatalog.query.get(catalog_id)
+    if not catalog or not os.path.exists(catalog.abs_file_path):
+        return None
+    try:
+        with open(catalog.abs_file_path, 'r', encoding='utf-8') as f:
+            questions = json.load(f)
+        for q in questions:
+            if q['id'] == question_id:
+                return q
+    except Exception as e:
+        current_app.logger.error(f"Fehler beim Laden der Frage {question_id} aus Katalog {catalog_id}: {e}")
+    return None
 
 
 def get_question_by_id(question_id):

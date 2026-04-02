@@ -40,3 +40,6 @@ testfragen.txt
 # Katalog-Daten (benutzerspezifisch, nicht ins Repo)
 data/catalogs/
 data/questions.json
+
+# Import-Dateien (lokal, nicht ins Repo)
+importfiles/

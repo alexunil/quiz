@@ -12,10 +12,10 @@ bp = Blueprint('questions', __name__, url_prefix='/questions')
 def load_catalog_questions(catalog):
     """Lädt Fragen aus einem Katalog"""
     try:
-        if not os.path.exists(catalog.file_path):
+        if not os.path.exists(catalog.abs_file_path):
             return []
 
-        with open(catalog.file_path, 'r', encoding='utf-8') as f:
+        with open(catalog.abs_file_path, 'r', encoding='utf-8') as f:
             questions = json.load(f)
             return questions if isinstance(questions, list) else []
     except Exception as e:
@@ -26,7 +26,7 @@ def load_catalog_questions(catalog):
 def save_catalog_questions(catalog, questions):
     """Speichert Fragen in einem Katalog"""
     try:
-        with open(catalog.file_path, 'w', encoding='utf-8') as f:
+        with open(catalog.abs_file_path, 'w', encoding='utf-8') as f:
             json.dump(questions, f, ensure_ascii=False, indent=2)
 
         # Question count aktualisieren

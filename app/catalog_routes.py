@@ -1,8 +1,9 @@
 """Katalog-Verwaltungs-Routes"""
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file, jsonify
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from app.models import db, QuestionCatalog, QuestionWeight
+from app.ai_service import generate_explanation
 import os
 import json
 import shutil
@@ -58,14 +59,16 @@ def create():
         user_dir = os.path.join(current_app.config['CATALOGS_DIR'], f'user_{current_user.id}')
         os.makedirs(user_dir, exist_ok=True)
 
-        # Dateiname für JSON
+        # Dateiname für JSON (relativ zu CATALOGS_DIR speichern)
         safe_name = secure_filename(name.replace(' ', '_').lower())
-        catalog_file = os.path.join(user_dir, f'{safe_name}.json')
+        relative_path = os.path.join(f'user_{current_user.id}', f'{safe_name}.json')
+        catalog_file = os.path.join(current_app.config['CATALOGS_DIR'], relative_path)
 
         # Sicherstellen dass Datei nicht bereits existiert
         counter = 1
         while os.path.exists(catalog_file):
-            catalog_file = os.path.join(user_dir, f'{safe_name}_{counter}.json')
+            relative_path = os.path.join(f'user_{current_user.id}', f'{safe_name}_{counter}.json')
+            catalog_file = os.path.join(current_app.config['CATALOGS_DIR'], relative_path)
             counter += 1
 
         # Katalog-Inhalt erstellen
@@ -89,11 +92,11 @@ def create():
             flash(f'Fehler beim Erstellen der Katalogdatei: {str(e)}', 'danger')
             return render_template('catalogs/create.html')
 
-        # Katalog in DB erstellen
+        # Katalog in DB erstellen (relativer Pfad)
         catalog = QuestionCatalog.create_catalog(
             user_id=current_user.id,
             name=name,
-            file_path=catalog_file,
+            file_path=relative_path,
             description=description if description else None,
             is_active=False
         )
@@ -189,7 +192,7 @@ def delete(catalog_id):
         # Wenn keine anderen Kataloge: erlauben zu löschen (User muss dann neuen erstellen)
 
     catalog_name = catalog.name
-    catalog_file = catalog.file_path
+    catalog_file = catalog.abs_file_path
 
     # Katalog aus DB löschen (cascade löscht auch QuestionWeights)
     db.session.delete(catalog)
@@ -288,14 +291,16 @@ def import_catalog():
         user_dir = os.path.join(current_app.config['CATALOGS_DIR'], f'user_{current_user.id}')
         os.makedirs(user_dir, exist_ok=True)
 
-        # Sicheren Dateinamen erstellen
+        # Sicheren Dateinamen erstellen (relativ zu CATALOGS_DIR speichern)
         safe_name = secure_filename(name.replace(' ', '_').lower())
-        catalog_file = os.path.join(user_dir, f'{safe_name}.json')
+        relative_path = os.path.join(f'user_{current_user.id}', f'{safe_name}.json')
+        catalog_file = os.path.join(current_app.config['CATALOGS_DIR'], relative_path)
 
         # Sicherstellen dass Datei nicht bereits existiert
         counter = 1
         while os.path.exists(catalog_file):
-            catalog_file = os.path.join(user_dir, f'{safe_name}_{counter}.json')
+            relative_path = os.path.join(f'user_{current_user.id}', f'{safe_name}_{counter}.json')
+            catalog_file = os.path.join(current_app.config['CATALOGS_DIR'], relative_path)
             counter += 1
 
         # Datei speichern
@@ -306,11 +311,11 @@ def import_catalog():
             flash(f'Fehler beim Speichern der Datei: {str(e)}', 'danger')
             return render_template('catalogs/import.html')
 
-        # Katalog in DB erstellen
+        # Katalog in DB erstellen (relativer Pfad)
         catalog = QuestionCatalog.create_catalog(
             user_id=current_user.id,
             name=name,
-            file_path=catalog_file,
+            file_path=relative_path,
             description=description if description else None,
             is_active=False
         )
@@ -336,7 +341,7 @@ def export(catalog_id):
         return redirect(url_for('catalogs.manage'))
 
     # Prüfen ob Datei existiert
-    if not os.path.exists(catalog.file_path):
+    if not os.path.exists(catalog.abs_file_path):
         flash('Katalog-Datei nicht gefunden.', 'danger')
         return redirect(url_for('catalogs.manage'))
 
@@ -345,7 +350,7 @@ def export(catalog_id):
 
     try:
         return send_file(
-            catalog.file_path,
+            catalog.abs_file_path,
             as_attachment=True,
             download_name=download_name,
             mimetype='application/json'
@@ -353,6 +358,66 @@ def export(catalog_id):
     except Exception as e:
         flash(f'Fehler beim Exportieren: {str(e)}', 'danger')
         return redirect(url_for('catalogs.manage'))
+
+
+@bp.route('/<int:catalog_id>/explain_status')
+@login_required
+def explain_status(catalog_id):
+    """Gibt Anzahl Fragen mit/ohne Erklärung zurück (JSON)"""
+    catalog = QuestionCatalog.query.filter_by(id=catalog_id, user_id=current_user.id).first_or_404()
+
+    if not os.path.exists(catalog.abs_file_path):
+        return jsonify({'error': 'Katalogdatei nicht gefunden'}), 404
+
+    with open(catalog.abs_file_path, 'r', encoding='utf-8') as f:
+        questions = json.load(f)
+
+    total = len(questions)
+    missing = sum(1 for q in questions if not q.get('explanation', '').strip())
+    return jsonify({'total': total, 'missing': missing, 'done': total - missing})
+
+
+@bp.route('/<int:catalog_id>/explain_next', methods=['POST'])
+@login_required
+def explain_next(catalog_id):
+    """Generiert KI-Erklärung für die nächste Frage ohne Erklärung (JSON)"""
+    catalog = QuestionCatalog.query.filter_by(id=catalog_id, user_id=current_user.id).first_or_404()
+
+    if not os.path.exists(catalog.abs_file_path):
+        return jsonify({'error': 'Katalogdatei nicht gefunden'}), 404
+
+    with open(catalog.abs_file_path, 'r', encoding='utf-8') as f:
+        questions = json.load(f)
+
+    # Nächste Frage ohne Erklärung finden
+    target_idx = None
+    for i, q in enumerate(questions):
+        if not q.get('explanation', '').strip():
+            target_idx = i
+            break
+
+    if target_idx is None:
+        total = len(questions)
+        return jsonify({'done': total, 'total': total, 'missing': 0, 'finished': True})
+
+    q = questions[target_idx]
+    explanation = generate_explanation(q)
+
+    if explanation:
+        questions[target_idx]['explanation'] = explanation
+        with open(catalog.abs_file_path, 'w', encoding='utf-8') as f:
+            json.dump(questions, f, ensure_ascii=False, indent=2)
+
+    total = len(questions)
+    missing = sum(1 for q in questions if not q.get('explanation', '').strip())
+    return jsonify({
+        'done': total - missing,
+        'total': total,
+        'missing': missing,
+        'finished': missing == 0,
+        'question_id': q.get('id'),
+        'error': None if explanation else 'KI-Fehler bei dieser Frage'
+    })
 
 
 @bp.route('/switch/<int:catalog_id>', methods=['POST'])

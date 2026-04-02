@@ -78,6 +78,15 @@ class QuestionCatalog(db.Model):
     quiz_sessions = db.relationship('QuizSession', backref='catalog', lazy=True)
     question_weights = db.relationship('QuestionWeight', backref='catalog', lazy=True, cascade='all, delete-orphan')
 
+    @property
+    def abs_file_path(self):
+        """Absoluter Dateipfad – löst relative Pfade zur Laufzeit über CATALOGS_DIR auf."""
+        import os
+        if os.path.isabs(self.file_path):
+            return self.file_path
+        from flask import current_app
+        return os.path.join(current_app.config['CATALOGS_DIR'], self.file_path)
+
     @staticmethod
     def create_catalog(user_id, name, file_path, description=None, is_active=False):
         """Neuen Katalog erstellen"""

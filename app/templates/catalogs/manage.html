@@ -33,15 +33,14 @@
                     {% endif %}
 
                     <div class="catalog-actions-row">
-                        {% if not catalog.is_active %}
-                            <form method="POST" action="{{ url_for('catalogs.activate', catalog_id=catalog.id) }}" style="display: inline;">
-                                <button type="submit" class="btn btn-sm btn-success">Aktivieren</button>
-                            </form>
-                        {% endif %}
-
                         <a href="{{ url_for('questions.catalog_questions', catalog_id=catalog.id) }}" class="btn btn-sm btn-primary">Fragen bearbeiten</a>
                         <a href="{{ url_for('catalogs.edit', catalog_id=catalog.id) }}" class="btn btn-sm btn-secondary">Bearbeiten</a>
                         <a href="{{ url_for('catalogs.export', catalog_id=catalog.id) }}" class="btn btn-sm btn-info">Exportieren</a>
+
+                        <button type="button" class="btn btn-sm btn-warning"
+                                onclick="openExplainModal({{ catalog.id }}, '{{ catalog.name|e }}')">
+                            KI Erklärungen
+                        </button>
 
                         <form method="POST" action="{{ url_for('catalogs.delete', catalog_id=catalog.id) }}"
                               onsubmit="return confirm('Katalog &quot;{{ catalog.name }}&quot; wirklich löschen? Alle Gewichtungen gehen verloren!');"
@@ -63,4 +62,125 @@
         </div>
     {% endif %}
 </div>
+
+<!-- KI Erklärungen Modal -->
+<div id="explain-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:8px; padding:2rem; max-width:500px; width:90%; box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+        <h3 id="explain-modal-title" style="margin-top:0;">KI Erklärungen generieren</h3>
+        <p id="explain-status-text">Lade Status...</p>
+
+        <div style="background:#e9ecef; border-radius:4px; height:24px; overflow:hidden; margin:1rem 0;">
+            <div id="explain-progress-bar" style="height:100%; background:#28a745; width:0%; transition:width 0.3s; display:flex; align-items:center; justify-content:center;">
+                <span id="explain-progress-label" style="color:#fff; font-size:0.8rem; font-weight:bold;"></span>
+            </div>
+        </div>
+
+        <p id="explain-current" style="font-size:0.85rem; color:#666; min-height:1.2em;"></p>
+
+        <div style="display:flex; gap:0.5rem; margin-top:1.5rem;">
+            <button id="explain-start-btn" class="btn btn-warning" onclick="startExplaining()">Starten</button>
+            <button id="explain-stop-btn" class="btn btn-secondary" onclick="stopExplaining()" style="display:none;">Stoppen</button>
+            <button class="btn btn-secondary" onclick="closeExplainModal()">Schließen</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let explainCatalogId = null;
+let explainRunning = false;
+let explainStopped = false;
+
+function openExplainModal(catalogId, catalogName) {
+    explainCatalogId = catalogId;
+    explainRunning = false;
+    explainStopped = false;
+    document.getElementById('explain-modal-title').textContent = 'KI Erklärungen: ' + catalogName;
+    document.getElementById('explain-current').textContent = '';
+    document.getElementById('explain-start-btn').style.display = '';
+    document.getElementById('explain-stop-btn').style.display = 'none';
+    document.getElementById('explain-modal').style.display = 'flex';
+    loadExplainStatus();
+}
+
+function closeExplainModal() {
+    explainStopped = true;
+    explainRunning = false;
+    document.getElementById('explain-modal').style.display = 'none';
+}
+
+function loadExplainStatus() {
+    fetch('/catalogs/' + explainCatalogId + '/explain_status')
+        .then(r => r.json())
+        .then(data => {
+            updateProgress(data.done, data.total);
+            if (data.missing === 0) {
+                document.getElementById('explain-status-text').textContent =
+                    'Alle ' + data.total + ' Fragen haben bereits eine Erklärung.';
+                document.getElementById('explain-start-btn').style.display = 'none';
+            } else {
+                document.getElementById('explain-status-text').textContent =
+                    data.missing + ' von ' + data.total + ' Fragen fehlen noch Erklärungen.';
+            }
+        });
+}
+
+function updateProgress(done, total) {
+    const pct = total > 0 ? Math.round(done / total * 100) : 0;
+    document.getElementById('explain-progress-bar').style.width = pct + '%';
+    document.getElementById('explain-progress-label').textContent = done + ' / ' + total;
+}
+
+function startExplaining() {
+    explainRunning = true;
+    explainStopped = false;
+    document.getElementById('explain-start-btn').style.display = 'none';
+    document.getElementById('explain-stop-btn').style.display = '';
+    explainNext();
+}
+
+function stopExplaining() {
+    explainStopped = true;
+    explainRunning = false;
+    document.getElementById('explain-stop-btn').style.display = 'none';
+    document.getElementById('explain-start-btn').textContent = 'Fortsetzen';
+    document.getElementById('explain-start-btn').style.display = '';
+    document.getElementById('explain-status-text').textContent = 'Gestoppt. Klicke "Fortsetzen" um weiterzumachen.';
+}
+
+function explainNext() {
+    if (explainStopped) return;
+
+    fetch('/catalogs/' + explainCatalogId + '/explain_next', {method: 'POST',
+        headers: {'X-CSRFToken': document.querySelector('meta[name=csrf-token]') ?
+            document.querySelector('meta[name=csrf-token]').content : ''}})
+        .then(r => r.json())
+        .then(data => {
+            updateProgress(data.done, data.total);
+
+            if (data.error) {
+                document.getElementById('explain-current').textContent = '⚠ ' + data.error;
+            } else if (data.question_id) {
+                document.getElementById('explain-current').textContent =
+                    '✓ Erklärung generiert für: ' + data.question_id;
+            }
+
+            if (data.finished) {
+                explainRunning = false;
+                document.getElementById('explain-stop-btn').style.display = 'none';
+                document.getElementById('explain-start-btn').style.display = 'none';
+                document.getElementById('explain-status-text').textContent =
+                    'Fertig! Alle ' + data.total + ' Fragen haben jetzt eine Erklärung.';
+                document.getElementById('explain-current').textContent = '';
+            } else if (!explainStopped) {
+                document.getElementById('explain-status-text').textContent =
+                    data.missing + ' Fragen verbleiben...';
+                setTimeout(explainNext, 100);
+            }
+        })
+        .catch(err => {
+            document.getElementById('explain-current').textContent = 'Fehler: ' + err;
+            stopExplaining();
+        });
+}
+</script>
 {% endblock %}

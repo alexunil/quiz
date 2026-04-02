@@ -4,6 +4,61 @@ from flask import current_app
 import json
 
 
+def generate_explanation(question: dict) -> str | None:
+    """
+    Generiert eine deutsche Erklärung für eine Multiple-Choice-Frage via Mistral AI.
+
+    Args:
+        question: Question-Dict mit 'question', 'options', 'correct_answer', 'question_type'
+
+    Returns:
+        Erklärungstext (str) oder None bei Fehler
+    """
+    api_key = current_app.config.get('MISTRAL_API_KEY')
+    if not api_key:
+        return None
+
+    options = question.get('options', {})
+    correct = question.get('correct_answer', '')
+    q_type = question.get('question_type', 'single')
+
+    # Antwortoptionen formatieren
+    options_text = '\n'.join(f"{k}) {v}" for k, v in sorted(options.items()))
+
+    # Richtige Antwort(en) formatieren
+    if isinstance(correct, list):
+        correct_letters = ', '.join(correct)
+        correct_texts = '\n'.join(f"{k}) {options[k]}" for k in correct if k in options)
+        correct_part = f"Richtig sind die Antworten {correct_letters}:\n{correct_texts}"
+    else:
+        correct_text = options.get(correct, '')
+        correct_part = f"Richtig ist Antwort {correct}: {correct_text}"
+
+    prompt = f"""In einer Multiple-Choice-Frage wird folgende Frage gestellt:
+
+{question['question']}
+
+mit folgenden Antworten:
+{options_text}
+
+{correct_part}
+
+Bitte schreibe eine Erklärung auf Deutsch, warum die richtige Antwort korrekt ist, warum man die anderen Antworten ausschließen kann und was mit der Frage geprüft werden soll. Antworte nur mit dem Erklärungstext, ohne Überschrift."""
+
+    try:
+        client = Mistral(api_key=api_key)
+        response = client.chat.complete(
+            model="mistral-small-latest",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=600
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        current_app.logger.error(f"Mistral generate_explanation error: {e}")
+        return None
+
+
 def evaluate_text_answer(question_text: str, user_answer: str, correct_answer: str) -> dict:
     """
     Bewertet eine Freitextantwort mit Mistral AI.

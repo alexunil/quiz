@@ -1,0 +1,17 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Lokale Daten (werden im Container separat als Volume gemountet)
+instance/
+data/catalogs/
+
+# Secrets
+.env
+
+# Entwicklungs-Dateien
+*.md
+test_*.py
+migrate_*.py

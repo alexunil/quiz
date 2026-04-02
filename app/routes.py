@@ -1,17 +1,20 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from flask_login import login_required, current_user
 from app.models import User, QuizSession, Response
-from app.quiz_manager import select_random_questions, get_question_by_id, calculate_statistics, load_questions, load_questions_for_user
+from app.quiz_manager import select_random_questions, get_question_by_id, calculate_statistics, load_questions, load_questions_for_user, get_question_from_catalog
 from app.ai_service import evaluate_text_answer
-import urllib.request
+import socket
 
 bp = Blueprint('main', __name__)
 
 
 def check_ai_availability():
-    """Prüft ob Internet/KI verfügbar ist (schneller Timeout)"""
+    """Prüft ob Internet/KI verfügbar ist (TCP-Connect, kein HTTP-Request)"""
     try:
-        urllib.request.urlopen('https://api.mistral.ai', timeout=3)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(3)
+        sock.connect(('api.mistral.ai', 443))
+        sock.close()
         return True
     except Exception:
         return False
@@ -104,12 +107,11 @@ def start_quiz():
     # Session als permanent markieren (verhindert vorzeitiges Ablaufen)
     session.permanent = True
 
-    # Session-Daten speichern
+    # Session-Daten speichern (nur IDs, keine vollständigen Fragen - Cookie-Limit 4KB)
     session['session_id'] = quiz_session.id
     session['user_id'] = current_user.id
     session['catalog_id'] = catalog_id
     session['question_ids'] = [q['id'] for q in selected_questions]
-    session['questions'] = selected_questions  # Komplette Fragen speichern
     session['current_index'] = 0
     session['correct_count'] = 0
     session['deferred_questions'] = []  # Zurückgestellte Fragen
@@ -128,19 +130,22 @@ def start_quiz():
 def question(index):
     """Frage anzeigen"""
     # Session-Daten validieren
-    if 'questions' not in session or 'session_id' not in session:
+    if 'question_ids' not in session or 'session_id' not in session:
         flash('Keine aktive Quiz-Session gefunden. Bitte starten Sie ein neues Quiz.', 'warning')
         return redirect(url_for('main.index'))
 
-    questions = session['questions']
+    question_ids = session['question_ids']
 
     # Index validieren
-    if index < 0 or index >= len(questions):
+    if index < 0 or index >= len(question_ids):
         flash('Ungültiger Fragen-Index.', 'error')
         return redirect(url_for('main.index'))
 
-    # Frage direkt aus Session holen
-    question_data = questions[index]
+    # Frage aus Katalog-Datei laden
+    question_data = get_question_from_catalog(session['catalog_id'], question_ids[index])
+    if not question_data:
+        flash('Frage nicht gefunden.', 'error')
+        return redirect(url_for('main.index'))
 
     # Aktuelle Position aktualisieren
     session['current_index'] = index
@@ -164,7 +169,7 @@ def question(index):
         'question.html',
         question=question_data,
         index=index,
-        total=len(questions),
+        total=len(question_ids),
         correct_count=session.get('correct_count', 0),
         time_info=time_info,
         quiz_mode=quiz_mode
@@ -176,19 +181,22 @@ def question(index):
 def answer(index):
     """Antwort verarbeiten und Feedback anzeigen - unterstützt single, multiple, text"""
     # Session-Daten validieren
-    if 'questions' not in session or 'session_id' not in session:
+    if 'question_ids' not in session or 'session_id' not in session:
         flash('Keine aktive Quiz-Session gefunden.', 'warning')
         return redirect(url_for('main.index'))
 
-    # Frage direkt aus Session holen
-    questions = session['questions']
+    question_ids = session['question_ids']
 
     # Index validieren
-    if index < 0 or index >= len(questions):
+    if index < 0 or index >= len(question_ids):
         flash('Ungültiger Fragen-Index.', 'error')
         return redirect(url_for('main.index'))
 
-    question_data = questions[index]
+    # Frage aus Katalog-Datei laden
+    question_data = get_question_from_catalog(session['catalog_id'], question_ids[index])
+    if not question_data:
+        flash('Frage nicht gefunden.', 'error')
+        return redirect(url_for('main.index'))
 
     question_type = question_data.get('question_type', 'single')
 
@@ -263,7 +271,7 @@ def answer(index):
         ai_reasoning=response.ai_reasoning,
         answered_after_timeout=answered_after_timeout,
         index=index,
-        total=len(questions),
+        total=len(question_ids),
         correct_count=session.get('correct_count', 0)
     )
 
@@ -272,11 +280,11 @@ def answer(index):
 @login_required
 def defer_question(index):
     """Frage zurückstellen und zur nächsten Frage"""
-    if 'questions' not in session:
+    if 'question_ids' not in session:
         flash('Keine aktive Quiz-Session gefunden.', 'warning')
         return redirect(url_for('main.index'))
 
-    questions = session['questions']
+    question_ids = session['question_ids']
     deferred = session.get('deferred_questions', [])
 
     # Frage zur Liste der zurückgestellten hinzufügen (falls noch nicht vorhanden)
@@ -288,7 +296,7 @@ def defer_question(index):
     next_index = index + 1
 
     # Wenn noch reguläre Fragen übrig sind
-    if next_index < len(questions):
+    if next_index < len(question_ids):
         return redirect(url_for('main.question', index=next_index))
 
     # Wenn alle regulären Fragen durch sind, zurückgestellte Fragen abarbeiten
@@ -306,15 +314,15 @@ def defer_question(index):
 @login_required
 def next_question(index):
     """Zur nächsten Frage oder zur Zusammenfassung"""
-    if 'questions' not in session:
+    if 'question_ids' not in session:
         flash('Keine aktive Quiz-Session gefunden.', 'warning')
         return redirect(url_for('main.index'))
 
-    questions = session['questions']
+    question_ids = session['question_ids']
     next_index = index + 1
 
     # Wenn noch reguläre Fragen übrig sind, zur nächsten Frage
-    if next_index < len(questions):
+    if next_index < len(question_ids):
         return redirect(url_for('main.question', index=next_index))
 
     # Wenn alle regulären Fragen durch sind, zurückgestellte Fragen abarbeiten
@@ -331,11 +339,10 @@ def next_question(index):
 def _complete_quiz():
     """Hilfsunktion: Quiz abschließen und zur Zusammenfassung"""
     quiz_session = QuizSession.query.get(session['session_id'])
-    questions = session.get('questions', [])
     if quiz_session:
         quiz_session.complete(
             correct_count=session.get('correct_count', 0),
-            total_count=len(questions)
+            total_count=len(session.get('question_ids', []))
         )
 
     return redirect(url_for('main.summary'))
@@ -475,30 +482,30 @@ def question_detail(question_id):
     """Detail-Ansicht einer einzelnen Frage (JSON für Modal)"""
     from app.models import QuestionWeight, QuestionCatalog
 
-    question = get_question_by_id(question_id)
+    catalog = current_user.get_active_catalog()
+    if not catalog:
+        return jsonify({'error': 'Kein aktiver Katalog'}), 404
+
+    question = get_question_from_catalog(catalog.id, question_id)
     if not question:
         return jsonify({'error': 'Frage nicht gefunden'}), 404
-
-    # Gewichtsinformationen für aktuellen User und aktiven Katalog abrufen
-    catalog = current_user.get_active_catalog()
     weight_data = []
 
-    if catalog:
-        weight = QuestionWeight.query.filter_by(
+    weight = QuestionWeight.query.filter_by(
             user_id=current_user.id,
             catalog_id=catalog.id,
             question_id=question_id
         ).first()
 
-        if weight:
-            weight_data.append({
-                'user_id': current_user.id,
-                'username': current_user.username,
-                'catalog_id': catalog.id,
-                'catalog_name': catalog.name,
-                'weight': weight.weight,
-                'last_updated': weight.last_updated.isoformat() if weight.last_updated else None
-            })
+    if weight:
+        weight_data.append({
+            'user_id': current_user.id,
+            'username': current_user.username,
+            'catalog_id': catalog.id,
+            'catalog_name': catalog.name,
+            'weight': weight.weight,
+            'last_updated': weight.last_updated.isoformat() if weight.last_updated else None
+        })
 
     # Question-Daten mit Gewichten kombinieren
     result = dict(question)
